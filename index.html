@@ -188,6 +188,79 @@
 
     let snake, food, direction, nextDirection, score, highScore, gameLoop, gameState;
 
+    // --- Sound System (Web Audio API) ---
+    let audioCtx = null;
+
+    function ensureAudioCtx() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      return audioCtx;
+    }
+
+    function playEatSound() {
+      const ctx = ensureAudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(440, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.08);
+
+      gain.gain.setValueAtTime(0.15, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.15);
+    }
+
+    function playGameOverSound() {
+      const ctx = ensureAudioCtx();
+      const notes = [392, 330, 262, 196];
+      notes.forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.15);
+
+        const noteStart = ctx.currentTime + i * 0.15;
+        gain.gain.setValueAtTime(0.12, noteStart);
+        gain.gain.exponentialRampToValueAtTime(0.01, noteStart + 0.2);
+
+        osc.start(noteStart);
+        osc.stop(noteStart + 0.2);
+      });
+    }
+
+    function playStartSound() {
+      const ctx = ensureAudioCtx();
+      const notes = [262, 330, 392, 523];
+      notes.forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.08);
+
+        const noteStart = ctx.currentTime + i * 0.08;
+        gain.gain.setValueAtTime(0.1, noteStart);
+        gain.gain.exponentialRampToValueAtTime(0.01, noteStart + 0.12);
+
+        osc.start(noteStart);
+        osc.stop(noteStart + 0.12);
+      });
+    }
+
     highScore = parseInt(localStorage.getItem('snakeHighScore')) || 0;
     highScoreEl.textContent = highScore;
 
@@ -239,6 +312,7 @@
       if (head.x === food.x && head.y === food.y) {
         score += 10;
         scoreEl.textContent = score;
+        playEatSound();
         placeFood();
       } else {
         snake.pop();
@@ -329,6 +403,7 @@
       gameState = 'playing';
       startScreen.style.display = 'none';
       gameOverScreen.style.display = 'none';
+      playStartSound();
       init();
       draw();
       if (gameLoop) clearInterval(gameLoop);
@@ -338,6 +413,7 @@
     function endGame() {
       gameState = 'gameover';
       clearInterval(gameLoop);
+      playGameOverSound();
       if (score > highScore) {
         highScore = score;
         highScoreEl.textContent = highScore;
