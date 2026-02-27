@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>Snake Game</title>
   <style>
     * {
@@ -19,15 +19,19 @@
       min-height: 100vh;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       color: #eee;
+      overflow: hidden;
+      touch-action: none;
     }
 
     .game-container {
       text-align: center;
+      max-width: 100vw;
+      padding: 10px;
     }
 
     h1 {
-      font-size: 2rem;
-      margin-bottom: 10px;
+      font-size: 1.8rem;
+      margin-bottom: 8px;
       color: #00d2ff;
       text-shadow: 0 0 10px rgba(0, 210, 255, 0.5);
     }
@@ -36,8 +40,8 @@
       display: flex;
       justify-content: center;
       gap: 40px;
-      margin-bottom: 15px;
-      font-size: 1.2rem;
+      margin-bottom: 10px;
+      font-size: 1.1rem;
     }
 
     .score-board span {
@@ -49,13 +53,14 @@
       border-radius: 4px;
       background: #16213e;
       box-shadow: 0 0 20px rgba(0, 210, 255, 0.3);
+      display: block;
+      max-width: 100%;
+      max-height: 50vh;
     }
 
-    .instructions {
-      margin-top: 15px;
-      color: #888;
-      font-size: 0.9rem;
-      line-height: 1.6;
+    .canvas-wrapper {
+      position: relative;
+      display: inline-block;
     }
 
     .overlay {
@@ -70,6 +75,8 @@
       align-items: center;
       background: rgba(0, 0, 0, 0.7);
       border-radius: 4px;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
     }
 
     .overlay h2 {
@@ -83,9 +90,48 @@
       color: #ccc;
     }
 
-    .canvas-wrapper {
-      position: relative;
-      display: inline-block;
+    /* D-Pad controls */
+    .dpad-container {
+      margin-top: 15px;
+      display: grid;
+      grid-template-columns: 70px 70px 70px;
+      grid-template-rows: 70px 70px 70px;
+      gap: 4px;
+      justify-content: center;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .dpad-btn {
+      width: 70px;
+      height: 70px;
+      border: 2px solid #00d2ff;
+      border-radius: 12px;
+      background: rgba(0, 210, 255, 0.1);
+      color: #00d2ff;
+      font-size: 1.8rem;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.1s;
+    }
+
+    .dpad-btn:active, .dpad-btn.active {
+      background: rgba(0, 210, 255, 0.4);
+    }
+
+    .dpad-spacer {
+      width: 70px;
+      height: 70px;
+    }
+
+    .instructions {
+      margin-top: 10px;
+      color: #888;
+      font-size: 0.85rem;
+      line-height: 1.5;
     }
   </style>
 </head>
@@ -100,17 +146,31 @@
       <canvas id="game" width="400" height="400"></canvas>
       <div class="overlay" id="start-screen">
         <h2 style="color: #00d2ff;">Snake Game</h2>
-        <p>Press any arrow key or tap to start</p>
+        <p>Tap to Start!</p>
       </div>
       <div class="overlay" id="game-over-screen" style="display: none;">
         <h2>Game Over!</h2>
         <p>Score: <span id="final-score">0</span></p>
-        <p style="margin-top: 8px;">Press any key or tap to restart</p>
+        <p style="margin-top: 8px;">Tap to Restart</p>
       </div>
     </div>
+
+    <!-- D-Pad for touch devices -->
+    <div class="dpad-container" id="dpad">
+      <div class="dpad-spacer"></div>
+      <div class="dpad-btn" data-dir="up">&#9650;</div>
+      <div class="dpad-spacer"></div>
+      <div class="dpad-btn" data-dir="left">&#9664;</div>
+      <div class="dpad-spacer"></div>
+      <div class="dpad-btn" data-dir="right">&#9654;</div>
+      <div class="dpad-spacer"></div>
+      <div class="dpad-btn" data-dir="down">&#9660;</div>
+      <div class="dpad-spacer"></div>
+    </div>
+
     <div class="instructions">
-      Arrow keys / WASD to move<br>
-      Eat the red food to grow and score points!
+      Arrow buttons or swipe to move<br>
+      Eat the red food to grow and score!
     </div>
   </div>
 
@@ -287,7 +347,77 @@
       gameOverScreen.style.display = 'flex';
     }
 
-    // Keyboard controls
+    // --- Overlay tap/click to start ---
+    startScreen.addEventListener('click', () => {
+      if (gameState === 'waiting') startGame();
+    });
+    startScreen.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      if (gameState === 'waiting') startGame();
+    });
+
+    gameOverScreen.addEventListener('click', () => {
+      if (gameState === 'gameover') startGame();
+    });
+    gameOverScreen.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      if (gameState === 'gameover') startGame();
+    });
+
+    // --- D-Pad controls ---
+    function handleDpadDirection(dir) {
+      if (gameState === 'waiting' || gameState === 'gameover') {
+        startGame();
+        return;
+      }
+      if (gameState !== 'playing') return;
+
+      switch (dir) {
+        case 'up':
+          if (direction.y === 0) nextDirection = { x: 0, y: -1 };
+          break;
+        case 'down':
+          if (direction.y === 0) nextDirection = { x: 0, y: 1 };
+          break;
+        case 'left':
+          if (direction.x === 0) nextDirection = { x: -1, y: 0 };
+          break;
+        case 'right':
+          if (direction.x === 0) nextDirection = { x: 1, y: 0 };
+          break;
+      }
+    }
+
+    document.querySelectorAll('.dpad-btn').forEach(btn => {
+      const dir = btn.dataset.dir;
+
+      btn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        btn.classList.add('active');
+        handleDpadDirection(dir);
+      });
+
+      btn.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        btn.classList.remove('active');
+      });
+
+      btn.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        btn.classList.add('active');
+        handleDpadDirection(dir);
+      });
+
+      btn.addEventListener('mouseup', () => {
+        btn.classList.remove('active');
+      });
+
+      btn.addEventListener('mouseleave', () => {
+        btn.classList.remove('active');
+      });
+    });
+
+    // --- Keyboard controls ---
     document.addEventListener('keydown', (e) => {
       if (gameState === 'waiting' || gameState === 'gameover') {
         startGame();
@@ -310,14 +440,10 @@
       }
     });
 
-    // Touch controls
+    // --- Swipe controls on canvas ---
     let touchStartX, touchStartY;
     canvas.addEventListener('touchstart', (e) => {
       e.preventDefault();
-      if (gameState === 'waiting' || gameState === 'gameover') {
-        startGame();
-        return;
-      }
       touchStartX = e.touches[0].clientX;
       touchStartY = e.touches[0].clientY;
     });
@@ -343,7 +469,7 @@
       touchStartY = e.touches[0].clientY;
     });
 
-    // Initial state
+    // --- Initial state ---
     gameState = 'waiting';
     init();
     draw();
